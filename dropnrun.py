@@ -9,7 +9,7 @@ import shapes
 camera_pos = (0,500,500)
 player_x = 0
 player_z = 0
-player_y = 60  # place player nearer the camera line for a TPP view
+player_y = 450  # place player nearer the camera line for a TPP view
 
 def draw_player():
   glPushMatrix()
@@ -60,7 +60,7 @@ def setup_camera():
   glMatrixMode(GL_MODELVIEW)
   cam_x, cam_y, cam_z = camera_pos
   gluLookAt(cam_x, cam_y, cam_z,
-            player_x, player_y, player_z,
+            0, 0, 0,
             0,0,1)
 
 def idle():
