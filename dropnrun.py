@@ -9,13 +9,98 @@ import shapes
 camera_pos = (0,500,500)
 player1_x = 0
 player1_z = 0
-player1_y = 575  # place player nearer the camera line for a TPP view
+player1_y = 575  # start at center of pitch
+
+PITCH_HALF = 600
+# The player model is scaled by 150. The body is a cube scaled by (0.4, 0.6, 0.2).
+# This means the visual radius is different for X and Y axes.
+# Y-radius = (0.6 * 150) / 2 = 45
+# X-radius = (0.4 * 150) / 2 = 30
+PLAYER_RADIUS_Y = 45
+PLAYER_RADIUS_X = 30
+
+is_jumping = False
+jump_velocity = 0
+is_crouching = False
+ground_level = 0
+
+def keyboard(key, x, y):
+    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching
+    key = key.decode("utf-8").lower()
+
+    step = 10
+
+    if key == 'w':
+        player1_y -= step
+    elif key == 's':
+        player1_y += step
+    elif key == 'a':
+        player1_x += step
+    elif key == 'd':
+        player1_x -= step
+    elif key == ' ' and not is_jumping:
+        is_jumping = True
+        jump_velocity = 20
+    elif key == 'c':
+        is_crouching = not is_crouching
+    elif key == 'f':
+        shoot()
+    
+    # Clamp using calculated constants with larger margin
+    max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
+    min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
+    max_y = PITCH_HALF - PLAYER_RADIUS_Y - 20
+    min_y = -PITCH_HALF + PLAYER_RADIUS_Y + 20
+    
+    if player1_x > max_x:
+        player1_x = max_x
+    if player1_x < min_x:
+        player1_x = min_x
+    if player1_y > max_y:
+        player1_y = max_y
+    if player1_y < min_y:
+        player1_y = min_y
+
+def mouse(button, state, x, y):
+    if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        shoot()
+
+def shoot():
+    print("Shoot!")
+
+def update_player():
+    global player1_z, player1_x, player1_y, is_jumping, jump_velocity
+    if is_jumping:
+        player1_z += jump_velocity
+        jump_velocity -= 1.5 # Gravity
+        if player1_z < ground_level:
+            player1_z = ground_level
+            is_jumping = False
+            jump_velocity = 0
+    
+    # Clamp using calculated constants with larger margin
+    max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
+    min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
+    max_y = PITCH_HALF - PLAYER_RADIUS_Y - 50
+    min_y = -PITCH_HALF + PLAYER_RADIUS_Y + 50
+    
+    if player1_x > max_x:
+        player1_x = max_x
+    if player1_x < min_x:
+        player1_x = min_x
+    if player1_y > max_y:
+        player1_y = max_y
+    if player1_y < min_y:
+        player1_y = min_y
 
 def draw_player():
   glPushMatrix()
   glTranslatef(player1_x, player1_y, player1_z)
   glRotatef(120, 1, 0, 0)  # orient model so z is up
-  glScalef(150, 150, 150)
+  if is_crouching:
+      glScalef(150, 150 * 0.7, 150)
+  else:
+      glScalef(150, 150, 150)
 
   glColor3f(0, 0, 1)
   for i in [-0.2, 0.2]:
@@ -64,6 +149,7 @@ def setup_camera():
             0,0,1)
 
 def idle():
+  update_player()
   glutPostRedisplay()
 
 def showScreen():
@@ -89,5 +175,7 @@ glutInitWindowSize(1000, 800)
 wind = glutCreateWindow(b"Drop 'n' Run")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
+glutKeyboardFunc(keyboard)
+glutMouseFunc(mouse)
 glutInitWindowPosition(0,0)
 glutMainLoop()
