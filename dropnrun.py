@@ -7,13 +7,13 @@ import shapes
 
 
 camera_pos = (0,500,500)
-player_x = 0
-player_z = 0
-player_y = 450  # place player nearer the camera line for a TPP view
+player1_x = 0
+player1_z = 0
+player1_y = 450  # place player nearer the camera line for a TPP view
 
 def draw_player():
   glPushMatrix()
-  glTranslatef(player_x, player_y, player_z)
+  glTranslatef(player1_x, player1_y, player1_z)
   glRotatef(90, 1, 0, 0)  # orient model so z is up
   glScalef(150, 150, 150)
 
