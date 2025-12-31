@@ -15,12 +15,14 @@ protection = SpawnProtection()
 GAME_STATE = "MENU"  # Can be "MENU", "PLAYING", or "GAME_OVER"
 
 SCORE_FILE = "game_score.txt"
+GUN_FILE = "gun_level.txt"
 
 def save_score(score):
     """Save score to file"""
     try:
         with open(SCORE_FILE, 'w') as f:
             f.write(str(score))
+        print(f"Score saved: {score}")  # Debug message
     except Exception as e:
         print(f"Error saving score: {e}")
 
@@ -34,7 +36,19 @@ def load_score():
         print(f"Error loading score: {e}")
     return 0
 
+def load_gun_level():
+    """Load gun level from file"""
+    try:
+        if os.path.exists(GUN_FILE):
+            with open(GUN_FILE, 'r') as f:
+                return int(f.read().strip())
+    except Exception as e:
+        print(f"Error loading gun level: {e}")
+    return 1
+
 PLAYER_SCORE = load_score()
+GUN_LEVEL = load_gun_level()
+BULLET_DAMAGE = GUN_LEVEL
 PLAYER_HP = 3
 DAMAGE = 1
 MOB_HP = 5
@@ -68,6 +82,13 @@ spawn_protection_time = 0  # Timer for spawn protection blinking (in frames)
 def keyboard(key, x, y):
     global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time
     key = key.decode("utf-8").lower()
+
+    # Handle ESC key to return to menu from playing
+    if key == '\x1b' and GAME_STATE == "PLAYING":
+        GAME_STATE = "MENU"
+        save_score(PLAYER_SCORE)
+        print("Returned to menu!")
+        return
 
     # Handle 'm' key to return to menu from game over
     if key == 'm' and GAME_STATE == "GAME_OVER":
@@ -196,7 +217,7 @@ def update_bullets():
                 mob_y_min < bullet_y_max and mob_y_max > bullet_y_min and
                 mob_z_min < bullet_z_max and mob_z_max > bullet_z_min):
                 # Hit detected
-                mob['hp'] -= 1
+                mob['hp'] -= BULLET_DAMAGE
                 bullets_to_remove.append(i)
                 
                 if mob['hp'] <= 0:
@@ -507,9 +528,61 @@ def game():
     
     setup_camera()
     
-    shapes.pitch()
-    shapes.wall()
-    shapes.background()
+    # Custom neon black and red background for Level 2
+    # Draw red-tinted pitch
+    glBegin(GL_QUADS)
+    glColor3f(0.3, 0, 0)  # Dark red pitch instead of white
+    glVertex3f(600, 600, 0)
+    glVertex3f(-600, 600, 0)
+    glVertex3f(-600, -600, 0)
+    glVertex3f(600, -600, 0)
+    glEnd()
+    
+    # Draw red wall
+    glBegin(GL_QUADS)
+    glColor3f(0.5, 0, 0)  # Dark red wall
+    glVertex3f(-10000,-600, 0)
+    glVertex3f(10000,-600, 0)
+    glVertex3f(10000,-600, 10000)
+    glVertex3f(-10000,-600, 10000)
+    glEnd()
+    
+    glLineWidth(40)
+    glBegin(GL_LINES)
+    glColor3f(1, 0, 0)  # Neon red line
+    glVertex3f(-10000,-600, 0)
+    glVertex3f(10000,-600,0)
+    glEnd()
+    
+    # Draw dark red/black side backgrounds
+    glBegin(GL_QUADS)
+    glColor3f(0.05, 0, 0)  # Very dark red/black
+    glVertex3f(-10000,600, 0)
+    glVertex3f(-600,600, 0)
+    glVertex3f(-600,-600, 0)
+    glVertex3f(-10000,-600, 0)
+    glEnd()
+
+    glBegin(GL_QUADS)
+    glColor3f(0.05, 0, 0)  # Very dark red/black
+    glVertex3f(10000,600, 0)
+    glVertex3f(600,600, 0)
+    glVertex3f(600,-600, 0)
+    glVertex3f(10000,-600, 0)
+    glEnd()
+    
+    glLineWidth(40)
+    glBegin(GL_LINES)
+    glColor3f(1, 0, 0)  # Neon red lines
+    glVertex3f(-600,-600, 0)
+    glVertex3f(-600,600,0)
+    glEnd()
+
+    glBegin(GL_LINES)
+    glColor3f(1, 0, 0)  # Neon red lines
+    glVertex3f(600,-600, 0)
+    glVertex3f(600,600,0)
+    glEnd()
     
     draw_bullets()  # Draw player bullets
     draw_enemy_bullets()  # Draw enemy bullets
@@ -532,6 +605,14 @@ def game():
     hp_text = f"HP: {PLAYER_HP}"
     for char in hp_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw score in top-right
+    glColor3f(1, 1, 0)  # Yellow color for score
+    glRasterPos2f(850, 30)
+    score_text = f"SCORE: {PLAYER_SCORE}"
+    for char in score_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
     glEnable(GL_DEPTH_TEST)
     
     glPopMatrix()
@@ -578,13 +659,14 @@ def draw_menu():
     glPushMatrix()
     glLoadIdentity()
     
-    # Draw background
+    # Draw background - neon black and red theme
     glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
-    glColor3f(0.2, 0.2, 0.3)
+    glColor3f(0.1, 0, 0)  # Dark red at top
     glVertex2f(0, 0)
     glVertex2f(1000, 0)
+    glColor3f(0.05, 0, 0)  # Almost black at bottom
     glVertex2f(1000, 800)
     glVertex2f(0, 800)
     glEnd()
@@ -596,22 +678,29 @@ def draw_menu():
     for char in score_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
+    # Draw gun level
+    glColor3f(0, 1, 0)
+    glRasterPos2f(20, 60)
+    gun_text = f"GUN LEVEL: {GUN_LEVEL}"
+    for char in gun_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
     # Draw title
-    glColor3f(1, 1, 1)
+    glColor3f(1, 0.1, 0.1)  # Neon red
     glRasterPos2f(300, 200)
     title = "DROP 'N' RUN - LEVEL 2"
     for char in title:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     # Draw PLAY button (text that can be clicked)
-    glColor3f(0, 1, 1)
+    glColor3f(1, 0, 0)  # Red
     glRasterPos2f(450, 350)
     play_text = "PLAY"
     for char in play_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     # Draw BACK TO MENU button
-    glColor3f(1, 0.5, 0)  # Orange color
+    glColor3f(1, 0.3, 0.3)  # Light neon red
     glRasterPos2f(400, 450)
     back_text = "BACK TO MENU"
     for char in back_text:
@@ -640,19 +729,20 @@ def draw_game_over():
     glPushMatrix()
     glLoadIdentity()
     
-    # Draw background
+    # Draw background - neon black and red theme
     glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
-    glColor3f(0.2, 0.2, 0.3)
+    glColor3f(0.1, 0, 0)  # Dark red at top
     glVertex2f(0, 0)
     glVertex2f(1000, 0)
+    glColor3f(0.05, 0, 0)  # Almost black at bottom
     glVertex2f(1000, 800)
     glVertex2f(0, 800)
     glEnd()
     
     # Draw GAME OVER text
-    glColor3f(1, 0, 0)
+    glColor3f(1, 0.1, 0.1)  # Brighter neon red
     glRasterPos2f(350, 300)
     game_over_text = "GAME OVER"
     for char in game_over_text:

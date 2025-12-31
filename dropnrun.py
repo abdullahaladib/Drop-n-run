@@ -16,6 +16,8 @@ protection = SpawnProtection()
 GAME_STATE = "MENU"  # Can be "MENU", "PLAYING", or "GAME_OVER"
 
 SCORE_FILE = "game_score.txt"
+GUN_FILE = "gun_level.txt"
+LEVEL2_UNLOCK_FILE = "level2_unlocked.txt"
 
 def save_score(score):
     """Save score to file"""
@@ -35,11 +37,51 @@ def load_score():
         print(f"Error loading score: {e}")
     return 0
 
+def save_gun_level(level):
+    """Save gun level to file"""
+    try:
+        with open(GUN_FILE, 'w') as f:
+            f.write(str(level))
+    except Exception as e:
+        print(f"Error saving gun level: {e}")
+
+def load_gun_level():
+    """Load gun level from file"""
+    try:
+        if os.path.exists(GUN_FILE):
+            with open(GUN_FILE, 'r') as f:
+                return int(f.read().strip())
+    except Exception as e:
+        print(f"Error loading gun level: {e}")
+    return 1
+
+def save_level2_unlock(unlocked):
+    """Save Level 2 unlock status"""
+    try:
+        with open(LEVEL2_UNLOCK_FILE, 'w') as f:
+            f.write('1' if unlocked else '0')
+    except Exception as e:
+        print(f"Error saving Level 2 unlock status: {e}")
+
+def load_level2_unlock():
+    """Load Level 2 unlock status"""
+    try:
+        if os.path.exists(LEVEL2_UNLOCK_FILE):
+            with open(LEVEL2_UNLOCK_FILE, 'r') as f:
+                return f.read().strip() == '1'
+    except Exception as e:
+        print(f"Error loading Level 2 unlock status: {e}")
+    return False
+
 PLAYER_SCORE = load_score()
+GUN_LEVEL = load_gun_level()
+BULLET_DAMAGE = GUN_LEVEL  # Damage increases with gun level
+LEVEL2_UNLOCKED = load_level2_unlock()
 PLAYER_HP = 3
 DAMAGE = 1
 MOB_HP = 5
 PLAYER_SKIN_COLOR = (0,1,1)
+reload_counter = 0  # Counter to reload score periodically
 
 camera_pos = (0,700,400)
 player1_x = 0
@@ -66,8 +108,15 @@ ground_level = 0
 spawn_protection_time = 0  # Timer for spawn protection blinking (in frames)
 
 def keyboard(key, x, y):
-    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time
+    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED
     key = key.decode("utf-8").lower()
+
+    # Handle ESC key to return to menu from playing
+    if key == '\x1b' and GAME_STATE == "PLAYING":
+        GAME_STATE = "MENU"
+        save_score(PLAYER_SCORE)
+        print("Returned to menu!")
+        return
 
     # Handle 'm' key to return to menu from game over
     if key == 'm' and GAME_STATE == "GAME_OVER":
@@ -89,6 +138,14 @@ def keyboard(key, x, y):
             mob['colliding'] = False
             mob['hp'] = 5
         PLAYER_SCORE = load_score()  # Load updated score
+        GUN_LEVEL = load_gun_level()  # Load updated gun level
+        BULLET_DAMAGE = GUN_LEVEL
+        LEVEL2_UNLOCKED = load_level2_unlock()  # Load Level 2 unlock status
+        # Check if player has reached 100 points to unlock Level 2
+        if PLAYER_SCORE >= 100 and not LEVEL2_UNLOCKED:
+            LEVEL2_UNLOCKED = True
+            save_level2_unlock(True)
+            print("Level 2 unlocked!")
         GAME_STATE = "MENU"
         print("Returning to menu!")
         return
@@ -182,7 +239,7 @@ def update_bullets():
                 mob_y_min < bullet_y_max and mob_y_max > bullet_y_min and
                 mob_z_min < bullet_z_max and mob_z_max > bullet_z_min):
                 # Hit detected
-                mob['hp'] -= 1
+                mob['hp'] -= BULLET_DAMAGE
                 bullets_to_remove.append(i)
                 
                 if mob['hp'] <= 0:
@@ -374,8 +431,18 @@ def spawn_mobs():
       mob['z'] = random.choice([0,145])
       mob['delay'] = random.randrange(60, 120)
 def idle():
-    global spawn_protection_time, GAME_STATE
+    global spawn_protection_time, GAME_STATE, PLAYER_SCORE, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, reload_counter
     protection.update()  # Update protection timer
+    
+    # Reload score, gun level, and level2 unlock status periodically (every 60 frames = ~1 second)
+    reload_counter += 1
+    if reload_counter >= 60:
+        reload_counter = 0
+        PLAYER_SCORE = load_score()
+        GUN_LEVEL = load_gun_level()
+        BULLET_DAMAGE = GUN_LEVEL
+        LEVEL2_UNLOCKED = load_level2_unlock()
+    
     if GAME_STATE == "PLAYING":
         spawn_mobs()
         check_collision()
@@ -420,6 +487,14 @@ def game():
     hp_text = f"HP: {PLAYER_HP}"
     for char in hp_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw score in top-right
+    glColor3f(1, 1, 0)  # Yellow color for score
+    glRasterPos2f(850, 30)
+    score_text = f"SCORE: {PLAYER_SCORE}"
+    for char in score_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
     glEnable(GL_DEPTH_TEST)
     
     glPopMatrix()
@@ -484,6 +559,13 @@ def draw_menu():
     for char in score_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
+    # Draw gun level in top-left
+    glColor3f(0, 1, 0)
+    glRasterPos2f(20, 30)
+    gun_text = f"GUN LEVEL: {GUN_LEVEL}"
+    for char in gun_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
     # Draw title
     glColor3f(1, 1, 1)
     glRasterPos2f(350, 200)
@@ -499,7 +581,7 @@ def draw_menu():
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     # Draw Level 2 button if unlocked
-    if PLAYER_SCORE >= 100:
+    if LEVEL2_UNLOCKED:
         glColor3f(0, 1, 0)  # Green for unlocked
         glRasterPos2f(420, 450)
         level2_text = "LEVEL 2 - PLAY"
@@ -510,6 +592,31 @@ def draw_menu():
         glRasterPos2f(380, 450)
         level2_text = "LEVEL 2 - LOCKED (100pts)"
         for char in level2_text:
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw 2 PLAYER MODE button
+    glColor3f(1, 1, 0)  # Yellow
+    glRasterPos2f(400, 550)
+    twoplay_text = "2 PLAYER MODE"
+    for char in twoplay_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw UPGRADE GUN button with dynamic cost (max level 4)
+    if GUN_LEVEL >= 4:
+        glColor3f(0.5, 0.5, 0.5)  # Gray for max level
+        glRasterPos2f(360, 650)
+        upgrade_text = f"UPGRADE GUN (MAX LEVEL {GUN_LEVEL})"
+        for char in upgrade_text:
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    else:
+        upgrade_cost = GUN_LEVEL * 50
+        if PLAYER_SCORE >= upgrade_cost:
+            glColor3f(0, 1, 0)  # Green if affordable
+        else:
+            glColor3f(0.5, 0.5, 0.5)  # Gray if not affordable
+        glRasterPos2f(360, 650)
+        upgrade_text = f"UPGRADE GUN (Level {GUN_LEVEL}) - {upgrade_cost} pts"
+        for char in upgrade_text:
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     glEnable(GL_DEPTH_TEST)
@@ -577,17 +684,22 @@ def draw_game_over():
 
 def mouse(button, state, x, y):
     """Handle mouse clicks"""
-    global GAME_STATE, PLAYER_SCORE
+    global GAME_STATE, PLAYER_SCORE, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED
     
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         # Check if click is within LEVEL 1 PLAY button area
         if 400 < x < 600 and 335 < y < 365 and GAME_STATE == "MENU":
             PLAYER_SCORE = load_score()  # Reload score in case level2 updated it
+            # Check if player has reached 100 points to unlock Level 2
+            if PLAYER_SCORE >= 100 and not LEVEL2_UNLOCKED:
+                LEVEL2_UNLOCKED = True
+                save_level2_unlock(True)
+                print("Level 2 unlocked!")
             GAME_STATE = "PLAYING"
             print("Level 1 started!")
         
         # Check if click is within LEVEL 2 button area and level is unlocked
-        elif 400 < x < 600 and 435 < y < 465 and GAME_STATE == "MENU" and PLAYER_SCORE >= 100:
+        elif 400 < x < 600 and 435 < y < 465 and GAME_STATE == "MENU" and LEVEL2_UNLOCKED:
             print("Launching Level 2...")
             save_score(PLAYER_SCORE)  # Save current score before launching level2
             # Launch level2.py as a separate process
@@ -596,6 +708,36 @@ def mouse(button, state, x, y):
                 print("Level 2 launched! You can close this window or continue playing Level 1.")
             except Exception as e:
                 print(f"Error launching Level 2: {e}")
+        
+        # Check if click is within 2 PLAYER MODE button area
+        elif 400 < x < 600 and 535 < y < 565 and GAME_STATE == "MENU":
+            print("Launching 2 Player Mode...")
+            save_score(PLAYER_SCORE)  # Save current score
+            try:
+                subprocess.Popen([sys.executable, "2player.py"])
+                print("2 Player Mode launched!")
+            except Exception as e:
+                print(f"Error launching 2 Player Mode: {e}")
+        
+        # Check if click is within UPGRADE GUN button area
+        elif 360 < x < 700 and 635 < y < 665 and GAME_STATE == "MENU":
+            if GUN_LEVEL >= 4:
+                print("Gun is already at maximum level (4)!")
+            else:
+                upgrade_cost = GUN_LEVEL * 50
+                if PLAYER_SCORE >= upgrade_cost:
+                    PLAYER_SCORE -= upgrade_cost
+                    GUN_LEVEL += 1
+                    BULLET_DAMAGE = GUN_LEVEL
+                    save_score(PLAYER_SCORE)
+                    save_gun_level(GUN_LEVEL)
+                    print(f"Gun upgraded to level {GUN_LEVEL}! Damage: {BULLET_DAMAGE}")
+                    if GUN_LEVEL < 4:
+                        print(f"Next upgrade cost: {GUN_LEVEL * 50} points")
+                    else:
+                        print("Gun has reached maximum level!")
+                else:
+                    print(f"Not enough points! Need {upgrade_cost} points.")
 
 def showScreen():
     global GAME_STATE
