@@ -3,10 +3,9 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import math
 import random
-import shapes
-import subprocess
 import sys
 import os
+import shapes
 from spawnprotection import SpawnProtection
 
 # Initialize spawn protection system
@@ -45,12 +44,13 @@ camera_pos = (0,700,400)
 player1_x = 0
 player1_z = 0
 player1_y = 575  # start at center of pitch
-mobs = [{'x': 0, 'y': -600, 'z': 30, 'delay': 0, 'colliding': False, 'hp': 5},
-        {'x': 0, 'y': -600, 'z': 30, 'delay': 30, 'colliding': False, 'hp': 5},
-        {'x': 0, 'y': -600, 'z': 30, 'delay': 60, 'colliding': False, 'hp': 5},
-        {'x': 0, 'y': -600, 'z': 30, 'delay': 90, 'colliding': False, 'hp': 5},
-        {'x': 0, 'y': -600, 'z': 30, 'delay': 120, 'colliding': False, 'hp': 5}]
-bullets = []  # List to store active bullets
+mobs = [{'x': 0, 'y': -600, 'z': 30, 'delay': 0, 'colliding': False, 'hp': 5, 'shoot_timer': 180, 'bullet_count': 0, 'is_shooting': False},
+        {'x': 0, 'y': -600, 'z': 30, 'delay': 30, 'colliding': False, 'hp': 5, 'shoot_timer': 210, 'bullet_count': 0, 'is_shooting': False},
+        {'x': 0, 'y': -600, 'z': 30, 'delay': 60, 'colliding': False, 'hp': 5, 'shoot_timer': 240, 'bullet_count': 0, 'is_shooting': False},
+        {'x': 0, 'y': -600, 'z': 30, 'delay': 90, 'colliding': False, 'hp': 5, 'shoot_timer': 270, 'bullet_count': 0, 'is_shooting': False},
+        {'x': 0, 'y': -600, 'z': 30, 'delay': 120, 'colliding': False, 'hp': 5, 'shoot_timer': 300, 'bullet_count': 0, 'is_shooting': False}]
+bullets = []  # List to store player bullets
+enemy_bullets = []  # List to store enemy bullets
 PITCH_HALF = 600
 # The player model is scaled by 150. The body is a cube scaled by (0.4, 0.6, 0.2).
 # This means the visual radius is different for X and Y axes.
@@ -80,6 +80,7 @@ def keyboard(key, x, y):
         player1_z = 0
         # Clear bullets
         bullets.clear()
+        enemy_bullets.clear()
         # Reset mobs
         for mob in mobs:
             mob['x'] = 0
@@ -88,7 +89,10 @@ def keyboard(key, x, y):
             mob['delay'] = random.randrange(0, 121)
             mob['colliding'] = False
             mob['hp'] = 5
-        PLAYER_SCORE = load_score()  # Load updated score
+            mob['shoot_timer'] = random.randrange(120, 240)
+            mob['bullet_count'] = 0
+            mob['is_shooting'] = False
+        save_score(PLAYER_SCORE)  # Save score before returning to menu
         GAME_STATE = "MENU"
         print("Returning to menu!")
         return
@@ -144,6 +148,16 @@ def shoot():
         bullets.append(bullet)
         print("Bullet fired!")
 
+def enemy_shoot(mob):
+    """Enemy fires 1 bullet towards the player"""
+    bullet = {
+        'x': mob['x'],
+        'y': mob['y'],
+        'z': mob['z'],
+        'vy': 20  # Faster bullet velocity towards the player (positive y direction)
+    }
+    enemy_bullets.append(bullet)
+
 def update_bullets():
     """Update bullet positions and check collisions"""
     global bullets, mobs, PLAYER_SCORE
@@ -193,6 +207,9 @@ def update_bullets():
                     mob['hp'] = 5
                     mob['colliding'] = False
                     mob['delay'] = 0
+                    mob['shoot_timer'] = random.randrange(120, 240)
+                    mob['bullet_count'] = 0
+                    mob['is_shooting'] = False
                     PLAYER_SCORE += 10
                     save_score(PLAYER_SCORE)
                     print(f"Obstacle destroyed! Score: {PLAYER_SCORE}")
@@ -203,13 +220,78 @@ def update_bullets():
         if i < len(bullets):
             bullets.pop(i)
 
+def update_enemy_bullets():
+    """Update enemy bullet positions and check collisions with player"""
+    global enemy_bullets, PLAYER_HP, player1_x, player1_y, player1_z, spawn_protection_time
+    bullets_to_remove = []
+    
+    for i, bullet in enumerate(enemy_bullets):
+        # Move bullet towards player
+        bullet['y'] += bullet['vy']
+        
+        # Remove bullet if it goes beyond the player
+        if bullet['y'] > 650:
+            bullets_to_remove.append(i)
+            continue
+        
+        # Only check collision if not in spawn protection
+        if spawn_protection_time <= 0:
+            # Player collision box
+            player_x_min = player1_x - PLAYER_RADIUS_X
+            player_x_max = player1_x + PLAYER_RADIUS_X
+            player_y_min = player1_y - PLAYER_RADIUS_Y
+            player_y_max = player1_y + PLAYER_RADIUS_Y
+            player_z_min = player1_z
+            if is_crouching:
+                player_z_max = player1_z + 70
+            else:
+                player_z_max = player1_z + 100
+            
+            # Bullet collision box
+            bullet_radius = 7.5
+            bullet_x_min = bullet['x'] - bullet_radius
+            bullet_x_max = bullet['x'] + bullet_radius
+            bullet_y_min = bullet['y'] - bullet_radius
+            bullet_y_max = bullet['y'] + bullet_radius
+            bullet_z_min = bullet['z'] - 75
+            bullet_z_max = bullet['z'] + 75
+            
+            # Check collision
+            if (player_x_min < bullet_x_max and player_x_max > bullet_x_min and
+                player_y_min < bullet_y_max and player_y_max > bullet_y_min and
+                player_z_min < bullet_z_max and player_z_max > bullet_z_min):
+                # Player hit by enemy bullet
+                PLAYER_HP -= 1
+                # Respawn player at initial position
+                player1_x = 0
+                player1_y = 575
+                player1_z = 0
+                spawn_protection_time = 180  # 3 seconds at 60 FPS
+                bullets_to_remove.append(i)
+                print(f"Hit by enemy bullet! HP: {PLAYER_HP}")
+    
+    # Remove bullets in reverse order to maintain indices
+    for i in sorted(bullets_to_remove, reverse=True):
+        if i < len(enemy_bullets):
+            enemy_bullets.pop(i)
+
 def draw_bullets():
-    """Draw all active bullets"""
+    """Draw all active player bullets"""
     for bullet in bullets:
         glPushMatrix()
         glTranslatef(bullet['x'], bullet['y'], bullet['z'])
         glColor3f(1, 0, 0)  # Red bullets
         glScalef(15, 15, 15)  # Larger cube for bullet
+        glutSolidCube(1)
+        glPopMatrix()
+
+def draw_enemy_bullets():
+    """Draw all active enemy bullets"""
+    for bullet in enemy_bullets:
+        glPushMatrix()
+        glTranslatef(bullet['x'], bullet['y'], bullet['z'])
+        glColor3f(0, 0, 0)  # Black bullets for enemies
+        glScalef(15, 15, 15)
         glutSolidCube(1)
         glPopMatrix()
 
@@ -366,13 +448,41 @@ def spawn_mobs():
     if mob['delay'] > 0:
       mob['delay'] -= 1
       continue
-    if mob['y'] != 575:
-      mob['y'] += 10
-    if mob['y'] >= 575:
-      mob['y'] = -600
-      mob['x'] = random.randrange(-580,580)
-      mob['z'] = random.choice([0,145])
-      mob['delay'] = random.randrange(60, 120)
+    
+    # Only move if not shooting
+    if not mob['is_shooting']:
+      if mob['y'] != 575:
+        mob['y'] += 10
+      if mob['y'] >= 575:
+        mob['y'] = -600
+        mob['x'] = random.randrange(-580,580)
+        mob['z'] = random.choice([0,145])
+        mob['delay'] = random.randrange(60, 120)
+    
+    # Enemy shooting logic - fire 3 bullets one after another, then wait 2 seconds
+    mob['shoot_timer'] -= 1
+    
+    # Only shoot if enemy is visible on screen (between wall and player)
+    if mob['y'] > -550 and mob['y'] < 550:
+      if mob['shoot_timer'] <= 0:
+        # Start shooting
+        mob['is_shooting'] = True
+        # Fire a bullet
+        enemy_shoot(mob)
+        mob['bullet_count'] += 1
+        
+        if mob['bullet_count'] < 3:
+          # Fire next bullet after 15 frames (0.25 seconds)
+          mob['shoot_timer'] = 15
+        else:
+          # All 3 bullets fired, wait 2 seconds before next burst
+          mob['shoot_timer'] = 120  # 2 seconds at 60 FPS
+          mob['bullet_count'] = 0
+          mob['is_shooting'] = False
+    else:
+      # Reset shooting state if enemy goes off screen
+      mob['is_shooting'] = False
+
 def idle():
     global spawn_protection_time, GAME_STATE
     protection.update()  # Update protection timer
@@ -380,7 +490,8 @@ def idle():
         spawn_mobs()
         check_collision()
         update_player()
-        update_bullets()  # Update bullet positions and collisions
+        update_bullets()  # Update player bullet positions and collisions
+        update_enemy_bullets()  # Update enemy bullet positions and collisions
         # Decrement spawn protection timer
         if spawn_protection_time > 0:
             spawn_protection_time -= 1
@@ -400,7 +511,8 @@ def game():
     shapes.wall()
     shapes.background()
     
-    draw_bullets()  # Draw bullets
+    draw_bullets()  # Draw player bullets
+    draw_enemy_bullets()  # Draw enemy bullets
     draw_player()
     draw_enemy()
     
@@ -486,31 +598,24 @@ def draw_menu():
     
     # Draw title
     glColor3f(1, 1, 1)
-    glRasterPos2f(350, 200)
-    title = "DROP 'N' RUN"
+    glRasterPos2f(300, 200)
+    title = "DROP 'N' RUN - LEVEL 2"
     for char in title:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     # Draw PLAY button (text that can be clicked)
     glColor3f(0, 1, 1)
-    glRasterPos2f(420, 350)
-    play_text = "LEVEL 1 - PLAY"
+    glRasterPos2f(450, 350)
+    play_text = "PLAY"
     for char in play_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
-    # Draw Level 2 button if unlocked
-    if PLAYER_SCORE >= 100:
-        glColor3f(0, 1, 0)  # Green for unlocked
-        glRasterPos2f(420, 450)
-        level2_text = "LEVEL 2 - PLAY"
-        for char in level2_text:
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
-    else:
-        glColor3f(0.5, 0.5, 0.5)  # Gray for locked
-        glRasterPos2f(380, 450)
-        level2_text = "LEVEL 2 - LOCKED (100pts)"
-        for char in level2_text:
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    # Draw BACK TO MENU button
+    glColor3f(1, 0.5, 0)  # Orange color
+    glRasterPos2f(400, 450)
+    back_text = "BACK TO MENU"
+    for char in back_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
     glEnable(GL_DEPTH_TEST)
     glPopMatrix()
@@ -577,25 +682,20 @@ def draw_game_over():
 
 def mouse(button, state, x, y):
     """Handle mouse clicks"""
-    global GAME_STATE, PLAYER_SCORE
+    global GAME_STATE
     
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
-        # Check if click is within LEVEL 1 PLAY button area
-        if 400 < x < 600 and 335 < y < 365 and GAME_STATE == "MENU":
-            PLAYER_SCORE = load_score()  # Reload score in case level2 updated it
+        # Check if click is within PLAY button area (approximate) - only works in MENU
+        if 430 < x < 530 and 335 < y < 365 and GAME_STATE == "MENU":
             GAME_STATE = "PLAYING"
-            print("Level 1 started!")
+            print("Level 2 started!")
         
-        # Check if click is within LEVEL 2 button area and level is unlocked
-        elif 400 < x < 600 and 435 < y < 465 and GAME_STATE == "MENU" and PLAYER_SCORE >= 100:
-            print("Launching Level 2...")
-            save_score(PLAYER_SCORE)  # Save current score before launching level2
-            # Launch level2.py as a separate process
-            try:
-                subprocess.Popen([sys.executable, "level2.py"])
-                print("Level 2 launched! You can close this window or continue playing Level 1.")
-            except Exception as e:
-                print(f"Error launching Level 2: {e}")
+        # Check if click is within BACK TO MENU button area
+        elif 400 < x < 600 and 435 < y < 465 and GAME_STATE == "MENU":
+            print("Returning to main menu...")
+            save_score(PLAYER_SCORE)  # Save score before exiting
+            # Force exit to return to dropnrun.py
+            os._exit(0)
 
 def showScreen():
     global GAME_STATE
@@ -611,7 +711,7 @@ def showScreen():
 glutInit()
 glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
 glutInitWindowSize(1000, 800)
-wind = glutCreateWindow(b"Drop 'n' Run")
+wind = glutCreateWindow(b"Drop 'n' Run - Level 2")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
 glutKeyboardFunc(keyboard)
