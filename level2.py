@@ -53,6 +53,7 @@ PLAYER_HP = 3
 DAMAGE = 1
 MOB_HP = 5
 PLAYER_SKIN_COLOR = (0,1,1)
+CHEAT_MODE = False
 
 camera_pos = (0,700,400)
 player1_x = 0
@@ -80,7 +81,7 @@ ground_level = 0
 spawn_protection_time = 0  # Timer for spawn protection blinking (in frames)
 
 def keyboard(key, x, y):
-    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time
+    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, CHEAT_MODE
     key = key.decode("utf-8").lower()
 
     # Handle ESC key to return to menu from playing
@@ -139,6 +140,9 @@ def keyboard(key, x, y):
         is_crouching = not is_crouching
     elif key == 'f':
         shoot()
+    elif key == 'y':
+        CHEAT_MODE = not CHEAT_MODE
+        print(f"Cheat mode {'enabled' if CHEAT_MODE else 'disabled'}!")
     
     # Clamp using calculated constants with larger margin
     max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
@@ -255,8 +259,8 @@ def update_enemy_bullets():
             bullets_to_remove.append(i)
             continue
         
-        # Only check collision if not in spawn protection
-        if spawn_protection_time <= 0:
+        # Only check collision if not in spawn protection and not in cheat mode
+        if spawn_protection_time <= 0 and not CHEAT_MODE:
             # Player collision box
             player_x_min = player1_x - PLAYER_RADIUS_X
             player_x_max = player1_x + PLAYER_RADIUS_X
@@ -415,6 +419,9 @@ def setup_camera():
 
 def check_collision():
   global player1_x, player1_y, player1_z, spawn_protection_time, PLAYER_HP
+  
+  if CHEAT_MODE:
+    return
   
   # Player collision box
   player_x_min = player1_x - PLAYER_RADIUS_X
@@ -648,7 +655,6 @@ def draw_menu():
     glLoadIdentity()
     glViewport(0, 0, 1000, 800)
     
-    # Setup 2D projection
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
@@ -657,18 +663,16 @@ def draw_menu():
     glPushMatrix()
     glLoadIdentity()
     
-    # Draw background - neon black and red theme
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
-    glColor3f(0.1, 0, 0)  # Dark red at top
+    glColor3f(0.1, 0, 0) 
     glVertex2f(0, 0)
     glVertex2f(1000, 0)
-    glColor3f(0.05, 0, 0)  # Almost black at bottom
+    glColor3f(0.05, 0, 0) 
     glVertex2f(1000, 800)
     glVertex2f(0, 800)
     glEnd()
     
-    # Draw score in top-right
     glColor3f(1, 1, 0)
     glRasterPos2f(850, 30)
     score_text = f"SCORE: {PLAYER_SCORE}"

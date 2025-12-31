@@ -95,9 +95,10 @@ jump_velocity = 0
 is_crouching = False
 ground_level = 0
 spawn_protection_time = 0
+CHEAT_MODE = False
 
 def keyboard(key, x, y):
-    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED
+    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, CHEAT_MODE
     key = key.decode("utf-8").lower()
 
     if key == '\x1b' and GAME_STATE == "PLAYING":
@@ -151,6 +152,9 @@ def keyboard(key, x, y):
         is_crouching = not is_crouching
     elif key == 'f':
         shoot()
+    elif key == 'y':
+        CHEAT_MODE = not CHEAT_MODE
+        print(f"Cheat mode {'enabled' if CHEAT_MODE else 'disabled'}!")
     
     max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
     min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
@@ -333,6 +337,9 @@ def setup_camera():
 
 def check_collision():
   global player1_x, player1_y, player1_z, spawn_protection_time, PLAYER_HP
+  
+  if CHEAT_MODE:
+    return
   
   player_x_min = player1_x - PLAYER_RADIUS_X
   player_x_max = player1_x + PLAYER_RADIUS_X
