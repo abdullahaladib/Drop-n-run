@@ -593,12 +593,11 @@ def game():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glColor3f(1, 0, 0)  # Red color for HP
     glRasterPos2f(20, 30)
@@ -627,12 +626,11 @@ def draw_text_2d(text, x, y, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glRasterPos2f(x, y)
     for char in text:
@@ -654,13 +652,12 @@ def draw_menu():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background - neon black and red theme
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.1, 0, 0)  # Dark red at top
@@ -724,13 +721,12 @@ def draw_game_over():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background - neon black and red theme
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.1, 0, 0)  # Dark red at top

@@ -439,12 +439,11 @@ def game():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     
     # Player 1 HP (left side, cyan or gray if dead)
@@ -485,13 +484,12 @@ def draw_menu():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.2, 0.2, 0.3)
@@ -539,13 +537,12 @@ def draw_game_over():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.2, 0.2, 0.3)

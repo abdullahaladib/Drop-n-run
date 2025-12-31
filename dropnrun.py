@@ -9,18 +9,16 @@ import sys
 import os
 from spawnprotection import SpawnProtection
 
-# Initialize spawn protection system
 protection = SpawnProtection()
 
-# Game state
-GAME_STATE = "MENU"  # Can be "MENU", "PLAYING", or "GAME_OVER"
+
+GAME_STATE = "MENU"
 
 SCORE_FILE = "game_score.txt"
 GUN_FILE = "gun_level.txt"
 LEVEL2_UNLOCK_FILE = "level2_unlocked.txt"
 
 def save_score(score):
-    """Save score to file"""
     try:
         with open(SCORE_FILE, 'w') as f:
             f.write(str(score))
@@ -28,7 +26,6 @@ def save_score(score):
         print(f"Error saving score: {e}")
 
 def load_score():
-    """Load score from file"""
     try:
         if os.path.exists(SCORE_FILE):
             with open(SCORE_FILE, 'r') as f:
@@ -38,7 +35,6 @@ def load_score():
     return 0
 
 def save_gun_level(level):
-    """Save gun level to file"""
     try:
         with open(GUN_FILE, 'w') as f:
             f.write(str(level))
@@ -46,7 +42,6 @@ def save_gun_level(level):
         print(f"Error saving gun level: {e}")
 
 def load_gun_level():
-    """Load gun level from file"""
     try:
         if os.path.exists(GUN_FILE):
             with open(GUN_FILE, 'r') as f:
@@ -56,7 +51,6 @@ def load_gun_level():
     return 1
 
 def save_level2_unlock(unlocked):
-    """Save Level 2 unlock status"""
     try:
         with open(LEVEL2_UNLOCK_FILE, 'w') as f:
             f.write('1' if unlocked else '0')
@@ -64,7 +58,6 @@ def save_level2_unlock(unlocked):
         print(f"Error saving Level 2 unlock status: {e}")
 
 def load_level2_unlock():
-    """Load Level 2 unlock status"""
     try:
         if os.path.exists(LEVEL2_UNLOCK_FILE):
             with open(LEVEL2_UNLOCK_FILE, 'r') as f:
@@ -75,29 +68,25 @@ def load_level2_unlock():
 
 PLAYER_SCORE = load_score()
 GUN_LEVEL = load_gun_level()
-BULLET_DAMAGE = GUN_LEVEL  # Damage increases with gun level
+BULLET_DAMAGE = GUN_LEVEL
 LEVEL2_UNLOCKED = load_level2_unlock()
 PLAYER_HP = 3
 DAMAGE = 1
 MOB_HP = 5
 PLAYER_SKIN_COLOR = (0,1,1)
-reload_counter = 0  # Counter to reload score periodically
+reload_counter = 0 
 
 camera_pos = (0,700,400)
 player1_x = 0
 player1_z = 0
-player1_y = 575  # start at center of pitch
+player1_y = 575 
 mobs = [{'x': 0, 'y': -600, 'z': 30, 'delay': 0, 'colliding': False, 'hp': 5},
         {'x': 0, 'y': -600, 'z': 30, 'delay': 30, 'colliding': False, 'hp': 5},
         {'x': 0, 'y': -600, 'z': 30, 'delay': 60, 'colliding': False, 'hp': 5},
         {'x': 0, 'y': -600, 'z': 30, 'delay': 90, 'colliding': False, 'hp': 5},
         {'x': 0, 'y': -600, 'z': 30, 'delay': 120, 'colliding': False, 'hp': 5}]
-bullets = []  # List to store active bullets
+bullets = []
 PITCH_HALF = 600
-# The player model is scaled by 150. The body is a cube scaled by (0.4, 0.6, 0.2).
-# This means the visual radius is different for X and Y axes.
-# Y-radius = (0.6 * 150) / 2 = 45
-# X-radius = (0.4 * 150) / 2 = 30
 PLAYER_RADIUS_Y = 45
 PLAYER_RADIUS_X = 30
 
@@ -105,31 +94,24 @@ is_jumping = False
 jump_velocity = 0
 is_crouching = False
 ground_level = 0
-spawn_protection_time = 0  # Timer for spawn protection blinking (in frames)
+spawn_protection_time = 0
 
 def keyboard(key, x, y):
     global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED
     key = key.decode("utf-8").lower()
 
-    # Handle ESC key to return to menu from playing
     if key == '\x1b' and GAME_STATE == "PLAYING":
         GAME_STATE = "MENU"
         save_score(PLAYER_SCORE)
         print("Returned to menu!")
         return
-
-    # Handle 'm' key to return to menu from game over
     if key == 'm' and GAME_STATE == "GAME_OVER":
-        # Reset game (but keep PLAYER_SCORE as persistent currency)
         PLAYER_HP = 3
         spawn_protection_time = 0
-        # Reset player position
         player1_x = 0
         player1_y = 575
         player1_z = 0
-        # Clear bullets
         bullets.clear()
-        # Reset mobs
         for mob in mobs:
             mob['x'] = 0
             mob['y'] = -600
@@ -137,11 +119,10 @@ def keyboard(key, x, y):
             mob['delay'] = random.randrange(0, 121)
             mob['colliding'] = False
             mob['hp'] = 5
-        PLAYER_SCORE = load_score()  # Load updated score
-        GUN_LEVEL = load_gun_level()  # Load updated gun level
+        PLAYER_SCORE = load_score() 
+        GUN_LEVEL = load_gun_level()
         BULLET_DAMAGE = GUN_LEVEL
-        LEVEL2_UNLOCKED = load_level2_unlock()  # Load Level 2 unlock status
-        # Check if player has reached 100 points to unlock Level 2
+        LEVEL2_UNLOCKED = load_level2_unlock()
         if PLAYER_SCORE >= 100 and not LEVEL2_UNLOCKED:
             LEVEL2_UNLOCKED = True
             save_level2_unlock(True)
@@ -150,7 +131,6 @@ def keyboard(key, x, y):
         print("Returning to menu!")
         return
 
-    # Only process game controls if playing
     if GAME_STATE != "PLAYING":
         return
 
@@ -172,7 +152,6 @@ def keyboard(key, x, y):
     elif key == 'f':
         shoot()
     
-    # Clamp using calculated constants with larger margin
     max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
     min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
     max_y = PITCH_HALF - PLAYER_RADIUS_Y - 20
@@ -189,36 +168,29 @@ def keyboard(key, x, y):
 
 
 def shoot():
-    """Fire a bullet from the player's position towards the wall"""
     if GAME_STATE == "PLAYING":
-        # Create bullet at player's gun position (above player, forward direction)
         bullet = {
             'x': player1_x,
-            'y': player1_y - 50,  # Gun position is forward from player
-            'z': player1_z + 60,  # Gun height
-            'vy': -15  # Bullet velocity towards the wall (negative y direction)
+            'y': player1_y - 50, 
+            'z': player1_z + 60, 
+            'vy': -15  
         }
         bullets.append(bullet)
         print("Bullet fired!")
 
 def update_bullets():
-    """Update bullet positions and check collisions"""
     global bullets, mobs, PLAYER_SCORE
     bullets_to_remove = []
     
     for i, bullet in enumerate(bullets):
-        # Move bullet
         bullet['y'] += bullet['vy']
         
-        # Remove bullet if it goes beyond the wall
         if bullet['y'] < -650:
             bullets_to_remove.append(i)
             continue
         
-        # Check collision with mobs
-        bullet_radius = 7.5  # Bullet is scaled 15x15x15, so radius is 7.5
+        bullet_radius = 7.5 
         for mob_idx, mob in enumerate(mobs):
-            # Mob collision box (cube of size 100)
             mob_x_min = mob['x'] - 50
             mob_x_max = mob['x'] + 50
             mob_y_min = mob['y'] - 50
@@ -226,24 +198,20 @@ def update_bullets():
             mob_z_min = mob['z'] - 50
             mob_z_max = mob['z'] + 50
             
-            # Check if bullet collides with mob (accounting for bullet size)
-            # Use a larger z-range for bullet to hit obstacles at different heights
             bullet_x_min = bullet['x'] - bullet_radius
             bullet_x_max = bullet['x'] + bullet_radius
             bullet_y_min = bullet['y'] - bullet_radius
             bullet_y_max = bullet['y'] + bullet_radius
-            bullet_z_min = bullet['z'] - 75  # Expanded z range to hit obstacles at z=0 and z=145
+            bullet_z_min = bullet['z'] - 75
             bullet_z_max = bullet['z'] + 75
             
             if (mob_x_min < bullet_x_max and mob_x_max > bullet_x_min and
                 mob_y_min < bullet_y_max and mob_y_max > bullet_y_min and
                 mob_z_min < bullet_z_max and mob_z_max > bullet_z_min):
-                # Hit detected
                 mob['hp'] -= BULLET_DAMAGE
                 bullets_to_remove.append(i)
                 
                 if mob['hp'] <= 0:
-                    # Respawn enemy at random location
                     mob['x'] = random.randrange(-580, 580)
                     mob['y'] = -600
                     mob['z'] = random.choice([0, 145])
@@ -255,18 +223,16 @@ def update_bullets():
                     print(f"Obstacle destroyed! Score: {PLAYER_SCORE}")
                 break
     
-    # Remove bullets in reverse order to maintain indices
     for i in sorted(bullets_to_remove, reverse=True):
         if i < len(bullets):
             bullets.pop(i)
 
 def draw_bullets():
-    """Draw all active bullets"""
     for bullet in bullets:
         glPushMatrix()
         glTranslatef(bullet['x'], bullet['y'], bullet['z'])
-        glColor3f(1, 0, 0)  # Red bullets
-        glScalef(15, 15, 15)  # Larger cube for bullet
+        glColor3f(1, 0, 0) 
+        glScalef(15, 15, 15)
         glutSolidCube(1)
         glPopMatrix()
 
@@ -274,13 +240,13 @@ def update_player():
     global player1_z, player1_x, player1_y, is_jumping, jump_velocity
     if is_jumping:
         player1_z += jump_velocity
-        jump_velocity -= 1 # Gravity
+        jump_velocity -= 1 
         if player1_z < ground_level:
             player1_z = ground_level
             is_jumping = False
             jump_velocity = 0
     
-    # Clamp using calculated constants with larger margin
+    
     max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
     min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
     max_y = PITCH_HALF - PLAYER_RADIUS_Y - 50
@@ -296,9 +262,7 @@ def update_player():
         player1_y = min_y
 
 def draw_player():
-  # Skip drawing during blink off phase of spawn protection
   if spawn_protection_time > 0:
-    # Blink effect: alternate visibility every 10 frames
     if (spawn_protection_time // 10) % 2 == 0:
       return
   
@@ -370,25 +334,20 @@ def setup_camera():
 def check_collision():
   global player1_x, player1_y, player1_z, spawn_protection_time, PLAYER_HP
   
-  # Player collision box
   player_x_min = player1_x - PLAYER_RADIUS_X
   player_x_max = player1_x + PLAYER_RADIUS_X
   player_y_min = player1_y - PLAYER_RADIUS_Y
   player_y_max = player1_y + PLAYER_RADIUS_Y
   player_z_min = player1_z
-  # Reduce height when crouching
   if is_crouching:
     player_z_max = player1_z + 70
   else:
     player_z_max = player1_z + 100
   
-  # Only check collisions if not in spawn protection
   if spawn_protection_time > 0:
     return
   
-  # Check collision with all enemies
   for idx, mob in enumerate(mobs):
-    # Enemy collision box (cube of size 100)
     enemy_x_min = mob['x'] - 50
     enemy_x_max = mob['x'] + 50
     enemy_y_min = mob['y'] - 50
@@ -396,26 +355,20 @@ def check_collision():
     enemy_z_min = mob['z'] - 50
     enemy_z_max = mob['z'] + 50
     
-    # Check if currently colliding
     is_currently_colliding = (player_x_min < enemy_x_max and player_x_max > enemy_x_min and
                               player_y_min < enemy_y_max and player_y_max > enemy_y_min and
                               player_z_min < enemy_z_max and player_z_max > enemy_z_min)
     
     if is_currently_colliding:
-      # Only register collision if this enemy wasn't already colliding
       if not mob['colliding']:
-        # Decrement HP
         PLAYER_HP -= 1
-        # Respawn player at initial position
         player1_x = 0
         player1_y = 575
         player1_z = 0
-        spawn_protection_time = 180  # 3 seconds at 60 FPS
+        spawn_protection_time = 180
         mob['colliding'] = True
-      # Keep colliding state true while touching
       mob['colliding'] = True
     else:
-      # No longer colliding, reset the flag for next collision
       mob['colliding'] = False
 
 def spawn_mobs():
@@ -432,9 +385,7 @@ def spawn_mobs():
       mob['delay'] = random.randrange(60, 120)
 def idle():
     global spawn_protection_time, GAME_STATE, PLAYER_SCORE, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, reload_counter
-    protection.update()  # Update protection timer
-    
-    # Reload score, gun level, and level2 unlock status periodically (every 60 frames = ~1 second)
+    protection.update()
     reload_counter += 1
     if reload_counter >= 60:
         reload_counter = 0
@@ -447,11 +398,9 @@ def idle():
         spawn_mobs()
         check_collision()
         update_player()
-        update_bullets()  # Update bullet positions and collisions
-        # Decrement spawn protection timer
+        update_bullets() 
         if spawn_protection_time > 0:
             spawn_protection_time -= 1
-        # Check if player is dead
         if PLAYER_HP <= 0:
             GAME_STATE = "GAME_OVER"
     glutPostRedisplay()
@@ -467,28 +416,25 @@ def game():
     shapes.wall()
     shapes.background()
     
-    draw_bullets()  # Draw bullets
+    draw_bullets() 
     draw_player()
     draw_enemy()
     
-    # Draw HP on screen
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
-    glColor3f(1, 0, 0)  # Red color for HP
+    glColor3f(1, 0, 0) 
     glRasterPos2f(20, 30)
     hp_text = f"HP: {PLAYER_HP}"
     for char in hp_text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
     
-    # Draw score in top-right
     glColor3f(1, 1, 0)  # Yellow color for score
     glRasterPos2f(850, 30)
     score_text = f"SCORE: {PLAYER_SCORE}"
@@ -509,12 +455,11 @@ def draw_text_2d(text, x, y, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glRasterPos2f(x, y)
     for char in text:
@@ -536,13 +481,12 @@ def draw_menu():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.2, 0.2, 0.3)
@@ -637,13 +581,12 @@ def draw_game_over():
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
-    glOrtho(0, 1000, 800, 0, -1, 1)
+    gluOrtho2D(0, 1000, 800, 0)
     glMatrixMode(GL_MODELVIEW)
     glPushMatrix()
     glLoadIdentity()
     
     # Draw background
-    glDisable(GL_LIGHTING)
     glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glColor3f(0.2, 0.2, 0.3)
