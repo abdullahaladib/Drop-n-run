@@ -10,11 +10,11 @@ camera_pos = (0,700,400)
 player1_x = 0
 player1_z = 0
 player1_y = 575  # start at center of pitch
-mobs = [{'x': 0, 'y': -600, 'z': 20},
-        {'x': 0, 'y': -600, 'z': 20},
-        {'x': 0, 'y': -600, 'z': 20},
-        {'x': 0, 'y': -600, 'z': 20},
-        {'x': 0, 'y': -600, 'z': 20}]
+mobs = [{'x': 0, 'y': -600, 'z': 20, 'delay': 0},
+        {'x': 0, 'y': -600, 'z': 20, 'delay': 30},
+        {'x': 0, 'y': -600, 'z': 20, 'delay': 60},
+        {'x': 0, 'y': -600, 'z': 20, 'delay': 90},
+        {'x': 0, 'y': -600, 'z': 20, 'delay': 120}]
 PITCH_HALF = 600
 # The player model is scaled by 150. The body is a cube scaled by (0.4, 0.6, 0.2).
 # This means the visual radius is different for X and Y axes.
@@ -65,9 +65,6 @@ def keyboard(key, x, y):
     if player1_y < min_y:
         player1_y = min_y
 
-def mouse(button, state, x, y):
-    if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
-        shoot()
 
 def shoot():
     print("Shoot!")
@@ -164,12 +161,16 @@ def setup_camera():
 
 def spawn_mobs():
   for mob in mobs:
+    if mob['delay'] > 0:
+      mob['delay'] -= 1
+      continue
     if mob['y'] != 575:
       mob['y'] += 10
     if mob['y'] >= 575:
       mob['y'] = -600
       mob['x'] = random.randrange(-580,580)
       mob['z'] = random.choice([0,145])
+      mob['delay'] = random.randrange(60, 120)
 def idle():
     spawn_mobs()
     update_player()
@@ -198,6 +199,5 @@ wind = glutCreateWindow(b"Drop 'n' Run")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
 glutKeyboardFunc(keyboard)
-glutMouseFunc(mouse)
 glutInitWindowPosition(0,0)
 glutMainLoop()
