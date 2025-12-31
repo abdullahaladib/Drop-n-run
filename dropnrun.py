@@ -6,11 +6,15 @@ import random
 import shapes
 
 
-camera_pos = (0,500,500)
+camera_pos = (0,700,400)
 player1_x = 0
 player1_z = 0
 player1_y = 575  # start at center of pitch
-
+mobs = [{'x': 0, 'y': -600, 'z': 20},
+        {'x': 0, 'y': -600, 'z': 20},
+        {'x': 0, 'y': -600, 'z': 20},
+        {'x': 0, 'y': -600, 'z': 20},
+        {'x': 0, 'y': -600, 'z': 20}]
 PITCH_HALF = 600
 # The player model is scaled by 150. The body is a cube scaled by (0.4, 0.6, 0.2).
 # This means the visual radius is different for X and Y axes.
@@ -38,9 +42,9 @@ def keyboard(key, x, y):
         player1_x += step
     elif key == 'd':
         player1_x -= step
-    elif key == ' ' and not is_jumping:
+    elif key == ' ' and not is_jumping and is_crouching == False:
         is_jumping = True
-        jump_velocity = 20
+        jump_velocity = 25
     elif key == 'c':
         is_crouching = not is_crouching
     elif key == 'f':
@@ -72,7 +76,7 @@ def update_player():
     global player1_z, player1_x, player1_y, is_jumping, jump_velocity
     if is_jumping:
         player1_z += jump_velocity
-        jump_velocity -= 1.5 # Gravity
+        jump_velocity -= 1 # Gravity
         if player1_z < ground_level:
             player1_z = ground_level
             is_jumping = False
@@ -96,7 +100,7 @@ def update_player():
 def draw_player():
   glPushMatrix()
   glTranslatef(player1_x, player1_y, player1_z)
-  glRotatef(120, 1, 0, 0)  # orient model so z is up
+  glRotatef(90, 1, 0, 0)
   if is_crouching:
       glScalef(150, 150 * 0.7, 150)
   else:
@@ -138,19 +142,38 @@ def draw_player():
 
   glPopMatrix()
 
+def draw_enemy():
+  for mob in mobs:
+    glPushMatrix()
+    glColor3f(1,0,0)
+    glTranslatef(mob['x'],mob['y'],mob['z'])
+    glutSolidCube(100)
+    glPopMatrix()
+
 def setup_camera():
   glMatrixMode(GL_PROJECTION)
   glLoadIdentity()
   gluPerspective(120, 1.25, 0.1, 1500)
   glMatrixMode(GL_MODELVIEW)
-  cam_x, cam_y, cam_z = camera_pos
+  cam_x = player1_x
+  cam_y = 700
+  cam_z = 400
   gluLookAt(cam_x, cam_y, cam_z,
-            0, 0, 0,
+            player1_x, 0, 0,
             0,0,1)
 
+def spawn_mobs():
+  for mob in mobs:
+    if mob['y'] != 575:
+      mob['y'] += 10
+    if mob['y'] >= 575:
+      mob['y'] = -600
+      mob['x'] = random.randrange(-580,580)
+      mob['z'] = random.choice([0,145])
 def idle():
-  update_player()
-  glutPostRedisplay()
+    spawn_mobs()
+    update_player()
+    glutPostRedisplay()
 
 def showScreen():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -164,8 +187,7 @@ def showScreen():
     shapes.background()
     
     draw_player()
-    
-    
+    draw_enemy()
     glutSwapBuffers()
     
     
