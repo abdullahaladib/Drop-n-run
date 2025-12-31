@@ -4,6 +4,11 @@ from OpenGL.GLUT import *
 import math
 import random
 import shapes
+import menu
+from spawnprotection import SpawnProtection
+
+# Initialize spawn protection system
+protection = SpawnProtection()
 
 # Game state
 GAME_STATE = "MENU"  # Can be "MENU" or "PLAYING"
@@ -182,7 +187,7 @@ def check_collision():
     player_z_max = player1_z + 100
   
   # Check collision with all enemies
-  for mob in mobs:
+  for idx, mob in enumerate(mobs):
     # Enemy collision box (cube of size 100)
     enemy_x_min = mob['x'] - 50
     enemy_x_max = mob['x'] + 50
@@ -195,8 +200,13 @@ def check_collision():
     if (player_x_min < enemy_x_max and player_x_max > enemy_x_min and
         player_y_min < enemy_y_max and player_y_max > enemy_y_min and
         player_z_min < enemy_z_max and player_z_max > enemy_z_min):
-      print("Collision detected!")
-      return False
+      # Use spawn protection to handle collision with this specific mob
+      if protection.handle_collision_detected(idx):
+        # Player is protected, phase through obstacle
+        continue  # Don't process damage, check next mob
+      else:
+        # Player not protected, collision takes effect
+        return False
   return True
 
 def spawn_mobs():
@@ -212,6 +222,10 @@ def spawn_mobs():
       mob['z'] = random.choice([0,145])
       mob['delay'] = random.randrange(60, 120)
 def idle():
+    protection.update()  # Update protection timer
+    spawn_mobs()
+    check_collision()
+    update_player()
     if GAME_STATE == "PLAYING":
         spawn_mobs()
         check_collision()
