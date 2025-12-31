@@ -4,7 +4,12 @@ from OpenGL.GLUT import *
 import math
 import random
 import shapes
+import menu
 
+PLAYER_SCORE = 0
+DAMAGE = 1
+MOB_HP = 5
+PLAYER_SKIN_COLOR = (0,1,1)
 
 camera_pos = (0,700,400)
 player1_x = 0
@@ -110,8 +115,9 @@ def draw_player():
     glRotatef(-90, 1, 0, 0)
     gluCylinder(gluNewQuadric(), 0.1, 0.05, 0.4, 10, 10)
     glPopMatrix()
-
-  glColor3f(0.4, 0.5, 0.2)
+  
+  r,g,b = PLAYER_SKIN_COLOR
+  glColor3f(r,g,b)
   glPushMatrix()
   glTranslatef(0, 1, 0)
   glScalef(0.4, 0.6, 0.2)
@@ -159,6 +165,37 @@ def setup_camera():
             player1_x, 0, 0,
             0,0,1)
 
+def check_collision():
+  # Player collision box
+  player_x_min = player1_x - PLAYER_RADIUS_X
+  player_x_max = player1_x + PLAYER_RADIUS_X
+  player_y_min = player1_y - PLAYER_RADIUS_Y
+  player_y_max = player1_y + PLAYER_RADIUS_Y
+  player_z_min = player1_z
+  # Reduce height when crouching
+  if is_crouching:
+    player_z_max = player1_z + 70
+  else:
+    player_z_max = player1_z + 100
+  
+  # Check collision with all enemies
+  for mob in mobs:
+    # Enemy collision box (cube of size 100)
+    enemy_x_min = mob['x'] - 50
+    enemy_x_max = mob['x'] + 50
+    enemy_y_min = mob['y'] - 50
+    enemy_y_max = mob['y'] + 50
+    enemy_z_min = mob['z'] - 50
+    enemy_z_max = mob['z'] + 50
+    
+    # Check collision
+    if (player_x_min < enemy_x_max and player_x_max > enemy_x_min and
+        player_y_min < enemy_y_max and player_y_max > enemy_y_min and
+        player_z_min < enemy_z_max and player_z_max > enemy_z_min):
+      print("Collision detected!")
+      return False
+  return True
+
 def spawn_mobs():
   for mob in mobs:
     if mob['delay'] > 0:
@@ -173,10 +210,11 @@ def spawn_mobs():
       mob['delay'] = random.randrange(60, 120)
 def idle():
     spawn_mobs()
+    check_collision()
     update_player()
     glutPostRedisplay()
 
-def showScreen():
+def game():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
     glViewport(0, 0, 1000, 800)
@@ -190,7 +228,9 @@ def showScreen():
     draw_player()
     draw_enemy()
     glutSwapBuffers()
-    
+def showScreen():
+    game()
+    #menu.menuScreen()
     
 glutInit()
 glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
