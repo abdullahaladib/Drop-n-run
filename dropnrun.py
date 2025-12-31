@@ -4,9 +4,12 @@ from OpenGL.GLUT import *
 import math
 import random
 import shapes
-import menu
+
+# Game state
+GAME_STATE = "MENU"  # Can be "MENU" or "PLAYING"
 
 PLAYER_SCORE = 0
+PLAYER_HP = 3
 DAMAGE = 1
 MOB_HP = 5
 PLAYER_SKIN_COLOR = (0,1,1)
@@ -209,9 +212,10 @@ def spawn_mobs():
       mob['z'] = random.choice([0,145])
       mob['delay'] = random.randrange(60, 120)
 def idle():
-    spawn_mobs()
-    check_collision()
-    update_player()
+    if GAME_STATE == "PLAYING":
+        spawn_mobs()
+        check_collision()
+        update_player()
     glutPostRedisplay()
 
 def game():
@@ -228,9 +232,102 @@ def game():
     draw_player()
     draw_enemy()
     glutSwapBuffers()
+
+def draw_text_2d(text, x, y, font=GLUT_BITMAP_HELVETICA_18):
+    """Draw 2D text at screen coordinates"""
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    glOrtho(0, 1000, 800, 0, -1, 1)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    
+    glDisable(GL_LIGHTING)
+    glDisable(GL_DEPTH_TEST)
+    glRasterPos2f(x, y)
+    for char in text:
+        glutBitmapCharacter(font, ord(char))
+    glEnable(GL_DEPTH_TEST)
+    
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+def draw_menu():
+    """Draw the main menu screen"""
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, 1000, 800)
+    
+    # Setup 2D projection
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    glOrtho(0, 1000, 800, 0, -1, 1)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    
+    # Draw background
+    glDisable(GL_LIGHTING)
+    glDisable(GL_DEPTH_TEST)
+    glBegin(GL_QUADS)
+    glColor3f(0.2, 0.2, 0.3)
+    glVertex2f(0, 0)
+    glVertex2f(1000, 0)
+    glVertex2f(1000, 800)
+    glVertex2f(0, 800)
+    glEnd()
+    
+    # Draw score in top-right
+    glColor3f(1, 1, 0)
+    glRasterPos2f(850, 30)
+    score_text = f"SCORE: {PLAYER_SCORE}"
+    for char in score_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw title
+    glColor3f(1, 1, 1)
+    glRasterPos2f(350, 200)
+    title = "DROP 'N' RUN"
+    for char in title:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    # Draw PLAY button (text that can be clicked)
+    glColor3f(0, 1, 1)
+    glRasterPos2f(450, 400)
+    play_text = "PLAY"
+    for char in play_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(char))
+    
+    glEnable(GL_DEPTH_TEST)
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+    
+    glutSwapBuffers()
+
+def mouse(button, state, x, y):
+    """Handle mouse clicks"""
+    global GAME_STATE
+    
+    if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        # Check if click is within PLAY button area (approximate)
+        if 430 < x < 530 and 385 < y < 415:
+            GAME_STATE = "PLAYING"
+            print("Game started!")
+
 def showScreen():
-    game()
-    #menu.menuScreen()
+    global GAME_STATE
+    
+    if GAME_STATE == "MENU":
+        draw_menu()
+    elif GAME_STATE == "PLAYING":
+        game()
+        
     
 glutInit()
 glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
@@ -239,5 +336,6 @@ wind = glutCreateWindow(b"Drop 'n' Run")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
 glutKeyboardFunc(keyboard)
+glutMouseFunc(mouse)
 glutInitWindowPosition(0,0)
 glutMainLoop()
