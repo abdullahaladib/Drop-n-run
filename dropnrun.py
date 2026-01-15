@@ -11,8 +11,13 @@ from spawnprotection import SpawnProtection
 
 protection = SpawnProtection()
 
+# Key state tracking for simultaneous inputs
+keys_down = set()
 
 GAME_STATE = "MENU"
+TARGET_FPS = 60.0
+frame_scale = 1.0
+last_time = None
 
 SCORE_FILE = "game_score.txt"
 GUN_FILE = "gun_level.txt"
@@ -68,7 +73,7 @@ def load_level2_unlock():
 
 PLAYER_SCORE = load_score()
 GUN_LEVEL = load_gun_level()
-BULLET_DAMAGE = GUN_LEVEL
+BULLET_DAMAGE = max(1, GUN_LEVEL)  # Ensure at least 1 damage
 LEVEL2_UNLOCKED = load_level2_unlock()
 PLAYER_HP = 3
 DAMAGE = 1
@@ -96,17 +101,21 @@ is_crouching = False
 ground_level = 0
 spawn_protection_time = 0
 CHEAT_MODE = False
+shoot_cooldown = 0
 
-def keyboard(key, x, y):
-    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, CHEAT_MODE
-    key = key.decode("utf-8").lower()
-
-    if key == '\x1b' and GAME_STATE == "PLAYING":
+def keyboardDown(key, x, y):
+    global GAME_STATE, PLAYER_HP, PLAYER_SCORE, spawn_protection_time, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, CHEAT_MODE
+    global player1_x, player1_y, player1_z, keys_down
+    
+    key_char = key.decode("utf-8").lower()
+    keys_down.add(key_char)
+    
+    if key_char == '\x1b' and GAME_STATE == "PLAYING":
         GAME_STATE = "MENU"
         save_score(PLAYER_SCORE)
         print("Returned to menu!")
         return
-    if key == 'm' and GAME_STATE == "GAME_OVER":
+    if key_char == 'm' and GAME_STATE == "GAME_OVER":
         PLAYER_HP = 3
         spawn_protection_time = 0
         player1_x = 0
@@ -132,30 +141,49 @@ def keyboard(key, x, y):
         print("Returning to menu!")
         return
 
-    if GAME_STATE != "PLAYING":
-        return
-
-    step = 10
-
-    if key == 'w':
-        player1_y -= step
-    elif key == 's':
-        player1_y += step
-    elif key == 'a':
-        player1_x += step
-    elif key == 'd':
-        player1_x -= step
-    elif key == ' ' and not is_jumping and is_crouching == False:
-        is_jumping = True
-        jump_velocity = 25
-    elif key == 'c':
-        is_crouching = not is_crouching
-    elif key == 'f':
-        shoot()
-    elif key == 'y':
+    if key_char == 'y' and GAME_STATE == "PLAYING":
         CHEAT_MODE = not CHEAT_MODE
         print(f"Cheat mode {'enabled' if CHEAT_MODE else 'disabled'}!")
+
+def keyboardUp(key, x, y):
+    global keys_down
+    key_char = key.decode("utf-8").lower()
+    keys_down.discard(key_char)
+
+def process_input():
+    global player1_x, player1_y, player1_z, is_jumping, jump_velocity, is_crouching, shoot_cooldown
     
+    if GAME_STATE != "PLAYING":
+        return
+    
+    step = 10 * frame_scale
+    
+    # Movement
+    if 'w' in keys_down:
+        player1_y -= step
+    if 's' in keys_down:
+        player1_y += step
+    if 'a' in keys_down:
+        player1_x += step
+    if 'd' in keys_down:
+        player1_x -= step
+    
+    # Jump
+    if ' ' in keys_down and not is_jumping and not is_crouching:
+        is_jumping = True
+        jump_velocity = 25
+    
+    # Crouch toggle
+    if 'c' in keys_down:
+        is_crouching = not is_crouching
+        keys_down.discard('c')
+    
+    # Shoot with cooldown
+    if 'f' in keys_down and shoot_cooldown <= 0:
+        shoot()
+        shoot_cooldown = 10
+    
+    # Clamp position
     max_x = PITCH_HALF - PLAYER_RADIUS_X - 50
     min_x = -PITCH_HALF + PLAYER_RADIUS_X + 50
     max_y = PITCH_HALF - PLAYER_RADIUS_Y - 20
@@ -180,40 +208,44 @@ def shoot():
             'vy': -15  
         }
         bullets.append(bullet)
-        print("Bullet fired!")
+    
 
 def update_bullets():
     global bullets, mobs, PLAYER_SCORE
     bullets_to_remove = []
     
     for i, bullet in enumerate(bullets):
-        bullet['y'] += bullet['vy']
+        bullet['y'] += bullet['vy'] * frame_scale
         
         if bullet['y'] < -650:
             bullets_to_remove.append(i)
             continue
         
-        bullet_radius = 7.5 
+        hit = False
         for mob_idx, mob in enumerate(mobs):
-            mob_x_min = mob['x'] - 50
-            mob_x_max = mob['x'] + 50
-            mob_y_min = mob['y'] - 50
-            mob_y_max = mob['y'] + 50
-            mob_z_min = mob['z'] - 50
-            mob_z_max = mob['z'] + 50
+            # MUCH larger collision boxes
+            mob_x_min = mob['x'] - 80
+            mob_x_max = mob['x'] + 80
+            mob_y_min = mob['y'] - 80
+            mob_y_max = mob['y'] + 80
+            mob_z_min = mob['z'] - 80
+            mob_z_max = mob['z'] + 80
             
-            bullet_x_min = bullet['x'] - bullet_radius
-            bullet_x_max = bullet['x'] + bullet_radius
-            bullet_y_min = bullet['y'] - bullet_radius
-            bullet_y_max = bullet['y'] + bullet_radius
-            bullet_z_min = bullet['z'] - 75
-            bullet_z_max = bullet['z'] + 75
+            bullet_x_min = bullet['x'] - 20
+            bullet_x_max = bullet['x'] + 20
+            bullet_y_min = bullet['y'] - 20
+            bullet_y_max = bullet['y'] + 20
+            bullet_z_min = bullet['z'] - 80
+            bullet_z_max = bullet['z'] + 80
             
+             
             if (mob_x_min < bullet_x_max and mob_x_max > bullet_x_min and
                 mob_y_min < bullet_y_max and mob_y_max > bullet_y_min and
                 mob_z_min < bullet_z_max and mob_z_max > bullet_z_min):
                 mob['hp'] -= BULLET_DAMAGE
-                bullets_to_remove.append(i)
+                if i not in bullets_to_remove:
+                    bullets_to_remove.append(i)
+                hit = True
                 
                 if mob['hp'] <= 0:
                     mob['x'] = random.randrange(-580, 580)
@@ -224,7 +256,6 @@ def update_bullets():
                     mob['delay'] = 0
                     PLAYER_SCORE += 10
                     save_score(PLAYER_SCORE)
-                    print(f"Obstacle destroyed! Score: {PLAYER_SCORE}")
                 break
     
     for i in sorted(bullets_to_remove, reverse=True):
@@ -243,8 +274,8 @@ def draw_bullets():
 def update_player():
     global player1_z, player1_x, player1_y, is_jumping, jump_velocity
     if is_jumping:
-        player1_z += jump_velocity
-        jump_velocity -= 1 
+        player1_z += jump_velocity * frame_scale
+        jump_velocity -= 1 * frame_scale 
         if player1_z < ground_level:
             player1_z = ground_level
             is_jumping = False
@@ -381,19 +412,33 @@ def check_collision():
 def spawn_mobs():
   for mob in mobs:
     if mob['delay'] > 0:
-      mob['delay'] -= 1
-      continue
+            mob['delay'] -= frame_scale
+            continue
     if mob['y'] != 575:
-      mob['y'] += 10
+            mob['y'] += 10 * frame_scale
     if mob['y'] >= 575:
       mob['y'] = -600
       mob['x'] = random.randrange(-580,580)
       mob['z'] = random.choice([0,145])
       mob['delay'] = random.randrange(60, 120)
 def idle():
-    global spawn_protection_time, GAME_STATE, PLAYER_SCORE, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, reload_counter
+    global spawn_protection_time, GAME_STATE, PLAYER_SCORE, GUN_LEVEL, BULLET_DAMAGE, LEVEL2_UNLOCKED, reload_counter, frame_scale, last_time, shoot_cooldown
+
+    current_time = glutGet(GLUT_ELAPSED_TIME) / 1000.0
+    if last_time is None:
+        last_time = current_time
+        delta_time = 1.0 / TARGET_FPS
+    else:
+        delta_time = max(0.0, current_time - last_time)
+        last_time = current_time
+
+    frame_scale = delta_time * TARGET_FPS
     protection.update()
-    reload_counter += 1
+    reload_counter += frame_scale
+    
+    if shoot_cooldown > 0:
+        shoot_cooldown -= frame_scale
+    
     if reload_counter >= 60:
         reload_counter = 0
         PLAYER_SCORE = load_score()
@@ -402,12 +447,15 @@ def idle():
         LEVEL2_UNLOCKED = load_level2_unlock()
     
     if GAME_STATE == "PLAYING":
+        process_input()
         spawn_mobs()
         check_collision()
         update_player()
         update_bullets() 
         if spawn_protection_time > 0:
-            spawn_protection_time -= 1
+            spawn_protection_time -= frame_scale
+            if spawn_protection_time < 0:
+                spawn_protection_time = 0
         if PLAYER_HP <= 0:
             GAME_STATE = "GAME_OVER"
     glutPostRedisplay()
@@ -706,7 +754,8 @@ glutInitWindowSize(1000, 800)
 wind = glutCreateWindow(b"Drop 'n' Run")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
-glutKeyboardFunc(keyboard)
+glutKeyboardFunc(keyboardDown)
+glutKeyboardUpFunc(keyboardUp)
 glutMouseFunc(mouse)
 glutInitWindowPosition(0,0)
 glutMainLoop()

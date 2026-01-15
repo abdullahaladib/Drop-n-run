@@ -9,6 +9,9 @@ import shapes
 
 # Game state
 GAME_STATE = "MENU"  # Can be "MENU", "PLAYING", or "GAME_OVER"
+TARGET_FPS = 60.0
+frame_scale = 1.0
+last_time = None
 
 # Player 1 data
 PLAYER1_HP = 3
@@ -31,6 +34,8 @@ player2_jump_velocity = 0
 player2_is_crouching = False
 player2_spawn_protection_time = 0
 PLAYER2_COLOR = (1, 0, 1)  # Magenta
+player1_shoot_cooldown = 0
+player2_shoot_cooldown = 0
 
 camera_pos = (0, 700, 400)
 mobs = [{'x': 0, 'y': -600, 'z': 30, 'delay': 0, 'colliding_p1': False, 'colliding_p2': False, 'hp': 5},
@@ -45,20 +50,24 @@ PLAYER_RADIUS_X = 30
 
 ground_level = 0
 
+# Key state tracking for simultaneous input
+keys_down = set()
+special_down = set()
+
 def keyboard(key, x, y):
     global player1_x, player1_y, player1_z, player1_is_jumping, player1_jump_velocity, player1_is_crouching
     global player2_x, player2_y, player2_z, player2_is_jumping, player2_jump_velocity, player2_is_crouching
-    global GAME_STATE, PLAYER1_HP, PLAYER2_HP
-    key = key.decode("utf-8").lower()
+    global GAME_STATE, PLAYER1_HP, PLAYER2_HP, keys_down
+    k = key.decode("utf-8").lower()
 
     # Handle ESC key to return to menu from playing
-    if key == '\x1b' and GAME_STATE == "PLAYING":
+    if k == '\x1b' and GAME_STATE == "PLAYING":
         GAME_STATE = "MENU"
         print("Returned to menu!")
         return
 
     # Handle 'm' key to return to menu from game over
-    if key == 'm' and GAME_STATE == "GAME_OVER":
+    if k == 'm' and GAME_STATE == "GAME_OVER":
         reset_game()
         GAME_STATE = "MENU"
         print("Returning to menu!")
@@ -68,65 +77,45 @@ def keyboard(key, x, y):
     if GAME_STATE != "PLAYING":
         return
 
-    step = 10
+    # Track held keys for continuous movement
+    keys_down.add(k)
 
-    # Player 1 controls (WASD + F) - only if alive
+    # Player 1 one-shot actions (only if alive)
     if PLAYER1_HP > 0:
-        if key == 'w':
-            player1_y -= step
-        elif key == 's':
-            player1_y += step
-        elif key == 'a':
-            player1_x += step
-        elif key == 'd':
-            player1_x -= step
-        elif key == ' ' and not player1_is_jumping and not player1_is_crouching:
+        if k == ' ' and not player1_is_jumping and not player1_is_crouching:
             player1_is_jumping = True
             player1_jump_velocity = 25
-        elif key == 'c':
+        elif k == 'c':
             player1_is_crouching = not player1_is_crouching
-        elif key == 'f':
-            shoot(1, player1_x, player1_y, player1_z)
-        
-        # Clamp player 1
-        clamp_player_position(1)
-    
-    # Player 2 controls (L for shoot, comma for jump, period for crouch) - only if alive
+
+    # Player 2 one-shot actions (only if alive)
     if PLAYER2_HP > 0:
-        if key == 'l':
-            shoot(2, player2_x, player2_y, player2_z)
-        if key == ',' and not player2_is_jumping and not player2_is_crouching:
+        if k == ',' and not player2_is_jumping and not player2_is_crouching:
             player2_is_jumping = True
             player2_jump_velocity = 25
-        if key == '.':
+        elif k == '.':
             player2_is_crouching = not player2_is_crouching
 
 def special_keys(key, x, y):
     """Handle special keys (arrow keys) for player 2"""
-    global player2_x, player2_y, player2_z, player2_is_jumping, player2_jump_velocity, player2_is_crouching
-    global GAME_STATE, PLAYER2_HP
+    global GAME_STATE, PLAYER2_HP, special_down
     
     if GAME_STATE != "PLAYING":
         return
-    
-    # Only allow Player 2 to move if alive
     if PLAYER2_HP <= 0:
         return
     
-    step = 10
-    
-    # Player 2 controls (Arrow keys)
-    if key == GLUT_KEY_UP:
-        player2_y -= step
-    elif key == GLUT_KEY_DOWN:
-        player2_y += step
-    elif key == GLUT_KEY_LEFT:
-        player2_x += step
-    elif key == GLUT_KEY_RIGHT:
-        player2_x -= step
-    
-    # Clamp player 2
-    clamp_player_position(2)
+    special_down.add(key)
+
+def special_keys_up(key, x, y):
+    global special_down
+    special_down.discard(key)
+
+def keyboard_up(key, x, y):
+    """Handle key release events"""
+    global keys_down
+    k = key.decode("utf-8").lower()
+    keys_down.discard(k)
 
 def clamp_player_position(player_num):
     """Clamp player position within bounds"""
@@ -167,33 +156,33 @@ def update_bullets():
     bullets_to_remove = []
     
     for i, bullet in enumerate(bullets):
-        bullet['y'] += bullet['vy']
+        bullet['y'] += bullet['vy'] * frame_scale
         
         if bullet['y'] < -650:
             bullets_to_remove.append(i)
             continue
         
-        bullet_radius = 7.5
         for mob in mobs:
-            mob_x_min = mob['x'] - 50
-            mob_x_max = mob['x'] + 50
-            mob_y_min = mob['y'] - 50
-            mob_y_max = mob['y'] + 50
-            mob_z_min = mob['z'] - 50
-            mob_z_max = mob['z'] + 50
+            mob_x_min = mob['x'] - 80
+            mob_x_max = mob['x'] + 80
+            mob_y_min = mob['y'] - 80
+            mob_y_max = mob['y'] + 80
+            mob_z_min = mob['z'] - 80
+            mob_z_max = mob['z'] + 80
             
-            bullet_x_min = bullet['x'] - bullet_radius
-            bullet_x_max = bullet['x'] + bullet_radius
-            bullet_y_min = bullet['y'] - bullet_radius
-            bullet_y_max = bullet['y'] + bullet_radius
-            bullet_z_min = bullet['z'] - 75
-            bullet_z_max = bullet['z'] + 75
+            bullet_x_min = bullet['x'] - 20
+            bullet_x_max = bullet['x'] + 20
+            bullet_y_min = bullet['y'] - 20
+            bullet_y_max = bullet['y'] + 20
+            bullet_z_min = bullet['z'] - 80
+            bullet_z_max = bullet['z'] + 80
             
             if (mob_x_min < bullet_x_max and mob_x_max > bullet_x_min and
                 mob_y_min < bullet_y_max and mob_y_max > bullet_y_min and
                 mob_z_min < bullet_z_max and mob_z_max > bullet_z_min):
                 mob['hp'] -= 1
-                bullets_to_remove.append(i)
+                if i not in bullets_to_remove:
+                    bullets_to_remove.append(i)
                 
                 if mob['hp'] <= 0:
                     mob['x'] = random.randrange(-580, 580)
@@ -228,8 +217,8 @@ def update_players():
     
     # Update player 1 jump
     if player1_is_jumping:
-        player1_z += player1_jump_velocity
-        player1_jump_velocity -= 1
+        player1_z += player1_jump_velocity * frame_scale
+        player1_jump_velocity -= 1 * frame_scale
         if player1_z < ground_level:
             player1_z = ground_level
             player1_is_jumping = False
@@ -237,8 +226,8 @@ def update_players():
     
     # Update player 2 jump
     if player2_is_jumping:
-        player2_z += player2_jump_velocity
-        player2_jump_velocity -= 1
+        player2_z += player2_jump_velocity * frame_scale
+        player2_jump_velocity -= 1 * frame_scale
         if player2_z < ground_level:
             player2_z = ground_level
             player2_is_jumping = False
@@ -387,29 +376,87 @@ def check_collision():
 def spawn_mobs():
     for mob in mobs:
         if mob['delay'] > 0:
-            mob['delay'] -= 1
+            mob['delay'] -= frame_scale
             continue
         if mob['y'] != 575:
-            mob['y'] += 10
+            mob['y'] += 10 * frame_scale
         if mob['y'] >= 575:
             mob['y'] = -600
             mob['x'] = random.randrange(-580, 580)
             mob['z'] = random.choice([0, 145])
             mob['delay'] = random.randrange(60, 120)
 
+def apply_held_movement():
+    """Apply continuous movement based on held keys (supports simultaneous input)."""
+    global player1_x, player1_y, player2_x, player2_y, frame_scale
+    global player1_shoot_cooldown, player2_shoot_cooldown
+    step = 10 * frame_scale
+
+    if PLAYER1_HP > 0:
+        if 'w' in keys_down:
+            player1_y -= step
+        if 's' in keys_down:
+            player1_y += step
+        if 'a' in keys_down:
+            player1_x += step
+        if 'd' in keys_down:
+            player1_x -= step
+        # Shooting with cooldown
+        if 'f' in keys_down and player1_shoot_cooldown <= 0:
+            shoot(1, player1_x, player1_y, player1_z)
+            player1_shoot_cooldown = 10
+        clamp_player_position(1)
+
+    if PLAYER2_HP > 0:
+        if GLUT_KEY_UP in special_down:
+            player2_y -= step
+        if GLUT_KEY_DOWN in special_down:
+            player2_y += step
+        if GLUT_KEY_LEFT in special_down:
+            player2_x += step
+        if GLUT_KEY_RIGHT in special_down:
+            player2_x -= step
+        # Shooting with cooldown (L key)
+        if 'l' in keys_down and player2_shoot_cooldown <= 0:
+            shoot(2, player2_x, player2_y, player2_z)
+            player2_shoot_cooldown = 10
+        clamp_player_position(2)
+
 def idle():
-    global player1_spawn_protection_time, player2_spawn_protection_time, GAME_STATE
+    global player1_spawn_protection_time, player2_spawn_protection_time, GAME_STATE, frame_scale, last_time
+    global player1_shoot_cooldown, player2_shoot_cooldown
+
+    current_time = glutGet(GLUT_ELAPSED_TIME) / 1000.0
+    if last_time is None:
+        last_time = current_time
+        delta_time = 1.0 / TARGET_FPS
+    else:
+        delta_time = max(0.0, current_time - last_time)
+        last_time = current_time
+
+    frame_scale = delta_time * TARGET_FPS
+    
+    # Decrease shoot cooldowns
+    if player1_shoot_cooldown > 0:
+        player1_shoot_cooldown -= frame_scale
+    if player2_shoot_cooldown > 0:
+        player2_shoot_cooldown -= frame_scale
     
     if GAME_STATE == "PLAYING":
+        apply_held_movement()
         spawn_mobs()
         check_collision()
         update_players()
         update_bullets()
         
         if player1_spawn_protection_time > 0:
-            player1_spawn_protection_time -= 1
+            player1_spawn_protection_time -= frame_scale
+            if player1_spawn_protection_time < 0:
+                player1_spawn_protection_time = 0
         if player2_spawn_protection_time > 0:
-            player2_spawn_protection_time -= 1
+            player2_spawn_protection_time -= frame_scale
+            if player2_spawn_protection_time < 0:
+                player2_spawn_protection_time = 0
         
         # Game over when BOTH players are dead
         if PLAYER1_HP <= 0 and PLAYER2_HP <= 0:
@@ -644,7 +691,9 @@ wind = glutCreateWindow(b"Drop 'n' Run - 2 Player")
 glutDisplayFunc(showScreen)
 glutIdleFunc(idle)
 glutKeyboardFunc(keyboard)
+glutKeyboardUpFunc(keyboard_up)
 glutSpecialFunc(special_keys)  # Add special keys handler for arrow keys
+glutSpecialUpFunc(special_keys_up)
 glutMouseFunc(mouse)
 glutInitWindowPosition(0, 0)
 glutMainLoop()
